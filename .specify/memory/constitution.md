@@ -1,11 +1,12 @@
 <!--
 Sync Impact Report
-- Version change: 1.1.0 → 1.2.0 (MINOR: new principle added)
-- Modified principles: none
-- Added principles:
-  VII. Test-Driven Development
-- Modified sections: Development Workflow & Quality Gates (test bullets aligned with VII;
-  TDD review gate added)
+- Version change: 1.2.0 → 1.3.0 (MINOR: materially changed guidance in Principle III)
+- Modified principles:
+  III. Pragmatic Simplicity — "single deployable backend (modular monolith)" replaced by three
+  independent components (frontend, backend, database); schema ownership moved to the database
+  component; backend still one service (research R18)
+- Added principles: none
+- Modified sections: none
 - Removed sections: none
 - Templates: not modified (scope guard: they read this file at runtime)
 - Deferred TODOs: none
@@ -37,8 +38,13 @@ Rationale: one team, one stack, nothing to babysit at 2 a.m.
 
 ### III. Pragmatic Simplicity
 
-- The system MUST be a single deployable backend (modular monolith) plus a single Angular app.
-  Microservices are prohibited unless an amendment approves them.
+- The system MUST consist of three independently built and deployed components that communicate
+  only over the network: **frontend** (Angular SSR, the only public entry point), **backend** (one
+  Spring Boot REST service) and **database** (PostgreSQL plus its own versioned migrations). The
+  components MUST NOT be packaged or deployed together as one unit.
+- The database component owns the schema: the backend MUST NOT create or alter tables at runtime.
+- The backend stays one service, organized by feature internally. Splitting it into
+  microservices is prohibited unless an amendment approves it.
 - Features MUST be built for requirements stated in the spec, not for hypothetical future ones
   (YAGNI). Abstractions need at least two real call sites.
 - Equally, essentials MUST NOT be skipped to look simple: input validation, error handling,
@@ -170,4 +176,4 @@ confirm whatever the code already does.
 - Every plan MUST include a Constitution Check; any violation MUST be recorded in Complexity
   Tracking with its justification, or the plan is rejected.
 
-**Version**: 1.2.0 | **Ratified**: 2026-11-07 | **Last Amended**: 2026-11-07
+**Version**: 1.3.0 | **Ratified**: 2026-11-07 | **Last Amended**: 2026-11-07

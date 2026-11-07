@@ -74,3 +74,15 @@ Automated checks over `pisadosroldan-backend/src/main` (98 classes) and
 Deviations recorded during implementation (see research.md R17): contract moved to OpenAPI 3.0.3;
 optional images omitted instead of `null`; the contract validator ignores `additionalProperties`
 and missing multipart bodies (tooling limitations).
+
+## Re-validation after R18 (one repository, three components)
+
+Run after moving to `frontend/` + `backend/` + `database/` and giving schema ownership to the
+database component.
+
+| Check | Result |
+|---|---|
+| `cd backend && ./mvnw verify` (migrations read from `../database/migrations`, contract from `../specs`) | **146 passed** |
+| `cd frontend && npm run lint && npm test && npx ng build` | lint clean, `contract:check` passed, **84 passed**, build OK |
+| `docker compose up --build` at the root | `db` healthy → `db-migrate` applied V1 + V2 and exited 0 → `backend` started (no Flyway in the backend) → `web` on :4000 |
+| E2E against the root stack, mobile + desktop, admin password only from the environment | **62 passed**; database back to seed state afterwards |
