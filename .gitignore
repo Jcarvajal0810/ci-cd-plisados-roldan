@@ -1,0 +1,52 @@
+# ---------------------------------------------------------------- secrets (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+credentials*.json
+secrets/
+
+# ---------------------------------------------------------------- uploaded images (runtime data)
+media/
+
+# ---------------------------------------------------------------- backend (Java / Maven)
+backend/target/
+*.class
+*.log
+hs_err_pid*
+**/.mvn/wrapper/maven-wrapper.jar
+
+# ---------------------------------------------------------------- frontend (Node / Angular)
+node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/coverage/
+frontend/out-tsc/
+npm-debug.log*
+.npm/
+
+# ---------------------------------------------------------------- end-to-end test output
+frontend/e2e/test-results/
+frontend/e2e/playwright-report/
+frontend/e2e/blob-report/
+frontend/e2e/playwright/.cache/
+
+# ---------------------------------------------------------------- local tool settings
+.claude/settings.local.json
+.claude/worktrees/
+.idea/
+*.iml
+**/.vscode/*
+!**/.vscode/extensions.json
+.history/
+
+# ---------------------------------------------------------------- OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.tmp

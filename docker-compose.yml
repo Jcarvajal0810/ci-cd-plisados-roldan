@@ -1,0 +1,64 @@
+# Plisados Roldán — three independent components wired over the network:
+#   database  → db (PostgreSQL 17) + db-migrate (Flyway: applies database/migrations, then exits)
+#   backend   → REST API (Spring Boot); connects to db over JDBC, never changes the schema
+#   frontend  → web (Angular SSR); the only public entry point, proxies /api, /media, /sitemap.xml
+#
+#   docker compose up --build          → whole site on http://localhost:4000
+#   docker compose up -d db db-migrate → only the database, for running the backend locally
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ${DB_NAME:-plisados}
+      POSTGRES_USER: ${DB_USER:-plisados}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5432:5432" # local development only; not reachable from other machines
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  db-migrate:
+    build: ./database
+    environment:
+      FLYWAY_URL: jdbc:postgresql://db:5432/${DB_NAME:-plisados}
+      FLYWAY_USER: ${DB_USER:-plisados}
+      FLYWAY_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-plisados}
+      DB_USER: ${DB_USER:-plisados}
+      DB_PASSWORD: ${DB_PASSWORD}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      MEDIA_ROOT: /data/media
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:4000}
+    volumes:
+      - media:/data/media
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+
+  web:
+    build: ./frontend
+    environment:
+      API_INTERNAL_URL: http://backend:8080
+      # Host names the SSR server accepts (SSRF protection); add the real domain when deployed.
+      NG_ALLOWED_HOSTS: ${NG_ALLOWED_HOSTS:-localhost,127.0.0.1}
+    ports:
+      - "4000:4000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  media:

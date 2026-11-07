@@ -1,0 +1,785 @@
+openapi: 3.0.3
+info:
+  title: Plisados Roldán API
+  version: 0.1.0
+  description: >
+    REST API for the Plisados Roldán informational website.
+    Public endpoints are read-only and return only published content.
+    Admin endpoints require an authenticated session cookie and, for unsafe methods,
+    the X-XSRF-TOKEN header matching the XSRF-TOKEN cookie (research R6).
+    All errors use RFC 9457 Problem Details (research R14).
+servers:
+  - url: /
+tags:
+  - name: public
+  - name: auth
+  - name: admin
+
+paths:
+  # ---------------------------------------------------------------- public
+  /api/public/home:
+    get:
+      tags: [public]
+      summary: Everything the home page needs in one call
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HomeView" }
+  /api/public/profile:
+    get:
+      tags: [public]
+      summary: Business profile (about, contact, schedule)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BusinessProfile" }
+  /api/public/offerings:
+    get:
+      tags: [public]
+      summary: Published offerings in display order
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OfferingSummary" }
+  /api/public/offerings/{slug}:
+    get:
+      tags: [public]
+      parameters: [{ $ref: "#/components/parameters/Slug" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OfferingDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/public/success-cases:
+    get:
+      tags: [public]
+      summary: Published success cases in display order
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SuccessCaseSummary" }
+  /api/public/success-cases/{slug}:
+    get:
+      tags: [public]
+      parameters: [{ $ref: "#/components/parameters/Slug" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessCaseDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/public/testimonials:
+    get:
+      tags: [public]
+      summary: Published testimonials in display order
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Testimonial" }
+  /sitemap.xml:
+    get:
+      tags: [public]
+      summary: Sitemap of all published public pages (FR-011)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/xml: {}
+  /media/{file}:
+    get:
+      tags: [public]
+      summary: Image variant, e.g. 3f2a...-960.jpg. Cache-Control immutable, 1 year.
+      parameters:
+        - name: file
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[0-9a-f-]{36}-(480|960|1600)\\.jpg$" }
+      responses:
+        "200":
+          description: OK
+          content:
+            image/jpeg: {}
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ---------------------------------------------------------------- auth
+  /api/auth/login:
+    post:
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "204": { description: Logged in; session cookie set }
+        "401": { $ref: "#/components/responses/Problem" }
+        "429":
+          description: Too many failed attempts (5 consecutive → 15 min block, research R7)
+          headers:
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      responses:
+        "204": { description: Session invalidated }
+  /api/auth/me:
+    get:
+      tags: [auth]
+      summary: Current admin; also issues the XSRF-TOKEN cookie
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminMe" }
+        "401": { $ref: "#/components/responses/Problem" }
+
+  # ---------------------------------------------------------------- admin: profile
+  /api/admin/profile:
+    get:
+      tags: [admin]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BusinessProfile" }
+    put:
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BusinessProfile" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BusinessProfile" }
+        "400": { $ref: "#/components/responses/ValidationProblem" }
+
+  # ---------------------------------------------------------------- admin: offerings
+  /api/admin/offerings:
+    get:
+      tags: [admin]
+      summary: All offerings including drafts, in display order
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AdminOffering" }
+    post:
+      tags: [admin]
+      summary: Create a draft offering (slug generated, order = last)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OfferingInput" }
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminOffering" }
+        "400": { $ref: "#/components/responses/ValidationProblem" }
+  /api/admin/offerings/order:
+    put:
+      tags: [admin]
+      requestBody: { $ref: "#/components/requestBodies/Order" }
+      responses:
+        "204": { description: Reordered }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/admin/offerings/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [admin]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminOffering" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OfferingInput" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminOffering" }
+        "400": { $ref: "#/components/responses/ValidationProblem" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [admin]
+      responses:
+        "204": { description: Deleted with its images }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/admin/offerings/{id}/publication:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    put:
+      tags: [admin]
+      requestBody: { $ref: "#/components/requestBodies/Publication" }
+      responses:
+        "204": { description: Publication state set }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/admin/offerings/{id}/images:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    post:
+      tags: [admin]
+      requestBody: { $ref: "#/components/requestBodies/ImageUpload" }
+      responses:
+        "201":
+          description: Image added at the end of the gallery
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Image" }
+        "400": { $ref: "#/components/responses/ValidationProblem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "413": { $ref: "#/components/responses/Problem" }
+  /api/admin/offerings/{id}/images/order:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    put:
+      tags: [admin]
+      requestBody: { $ref: "#/components/requestBodies/Order" }
+      responses:
+        "204": { description: Reordered }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/admin/offerings/{id}/images/{imageId}:
+    parameters:
+      - { $ref: "#/components/parameters/Id" }
+      - { $ref: "#/components/parameters/ImageId" }
+    patch:
+      tags: [admin]
+      requestBody: { $ref: "#/components/requestBodies/AltText" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Image" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [admin]
+      responses:
+        "204": { description: Removed (files deleted after commit) }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ---------------------------------------------------------------- admin: success cases
+  # Same operations as offerings. Input adds `featured` and `offeringIds`.
+  /api/admin/success-cases:
+    get:
+      tags: [admin]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AdminSuccessCase" }
+    post:
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SuccessCaseInput" }
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminSuccessCase" }
+        "400": { $ref: "#/components/responses/ValidationProblem" }
+  /api/admin/success-cases/order:
+    put:
+      tags: [admin]
+      requestBody: { $ref: "#/components/requestBodies/Order" }
+      responses:
+        "204": { description: Reordered }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/admin/success-cases/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [admin]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminSuccessCase" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SuccessCaseInput" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminSuccessCase" }
+        "400": { $ref: "#/components/responses/ValidationProblem" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [admin]
+      responses:
+        "204": { description: Deleted with its images }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/admin/success-cases/{id}/publication:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    put:
+      tags: [admin]
+      requestBody: { $ref: "#/components/requestBodies/Publication" }
+      responses:
+        "204": { description: Publication state set }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/admin/success-cases/{id}/images:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    post:
+      tags: [admin]
+      requestBody: { $ref: "#/components/requestBodies/ImageUpload" }
+      responses:
+        "201":
+          description: Image added at the end of the gallery
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Image" }
+        "400": { $ref: "#/components/responses/ValidationProblem" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "413": { $ref: "#/components/responses/Problem" }
+  /api/admin/success-cases/{id}/images/order:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    put:
+      tags: [admin]
+      requestBody: { $ref: "#/components/requestBodies/Order" }
+      responses:
+        "204": { description: Reordered }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/admin/success-cases/{id}/images/{imageId}:
+    parameters:
+      - { $ref: "#/components/parameters/Id" }
+      - { $ref: "#/components/parameters/ImageId" }
+    patch:
+      tags: [admin]
+      requestBody: { $ref: "#/components/requestBodies/AltText" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Image" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [admin]
+      responses:
+        "204": { description: Removed (files deleted after commit) }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ---------------------------------------------------------------- admin: testimonials
+  /api/admin/testimonials:
+    get:
+      tags: [admin]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AdminTestimonial" }
+    post:
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TestimonialInput" }
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminTestimonial" }
+        "400": { $ref: "#/components/responses/ValidationProblem" }
+  /api/admin/testimonials/order:
+    put:
+      tags: [admin]
+      requestBody: { $ref: "#/components/requestBodies/Order" }
+      responses:
+        "204": { description: Reordered }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/admin/testimonials/{id}:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    get:
+      tags: [admin]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminTestimonial" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TestimonialInput" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminTestimonial" }
+        "400": { $ref: "#/components/responses/ValidationProblem" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [admin]
+      responses:
+        "204": { description: Deleted with its photo }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/admin/testimonials/{id}/publication:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    put:
+      tags: [admin]
+      requestBody: { $ref: "#/components/requestBodies/Publication" }
+      responses:
+        "204": { description: Publication state set }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/admin/testimonials/{id}/photo:
+    parameters: [{ $ref: "#/components/parameters/Id" }]
+    put:
+      tags: [admin]
+      summary: Set or replace the single optional photo
+      requestBody: { $ref: "#/components/requestBodies/ImageUpload" }
+      responses:
+        "200":
+          description: Photo set
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Image" }
+        "400": { $ref: "#/components/responses/ValidationProblem" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "413": { $ref: "#/components/responses/Problem" }
+    delete:
+      tags: [admin]
+      responses:
+        "204": { description: Photo removed }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  parameters:
+    Slug:
+      name: slug
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$", maxLength: 100 }
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    ImageId:
+      name: imageId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+
+  requestBodies:
+    Order:
+      required: true
+      description: Full ordered list of existing IDs; anything else → 409 (research R10)
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ids]
+            properties:
+              ids:
+                type: array
+                items: { type: integer, format: int64 }
+                uniqueItems: true
+    Publication:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [published]
+            properties:
+              published: { type: boolean }
+    ImageUpload:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [file]
+            properties:
+              file:
+                type: string
+                format: binary
+                description: JPEG, PNG or WebP, ≤ 10 MB
+              altText: { type: string, maxLength: 150 }
+    AltText:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              altText: { type: string, nullable: true, maxLength: 150 }
+
+  responses:
+    NotFound:
+      description: Not found (or not published, for public endpoints)
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Problem:
+      description: Error
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    ValidationProblem:
+      description: Validation failed
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  schemas:
+    Problem:
+      type: object
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        errors:
+          type: object
+          description: Field name → message (validation errors only)
+          additionalProperties: { type: string }
+
+    Image:
+      type: object
+      required: [id, url, srcset, width, height, alt]
+      properties:
+        id: { type: integer, format: int64 }
+        url: { type: string, description: "Default variant (960), e.g. /media/{key}-960.jpg" }
+        srcset: { type: string, description: "All variants, ready for <img srcset>" }
+        width: { type: integer }
+        height: { type: integer }
+        alt: { type: string, description: "Alt text, or the owner item's name if not set" }
+
+    BusinessProfile:
+      type: object
+      required: [businessName, slogan, aboutText, whatsappNumber, locationText, scheduleText]
+      properties:
+        businessName: { type: string, maxLength: 80 }
+        slogan: { type: string, maxLength: 120 }
+        aboutText: { type: string, maxLength: 8000 }
+        whatsappNumber: { type: string, pattern: "^[0-9]{10,15}$", example: "573116254705" }
+        locationText: { type: string, maxLength: 200 }
+        scheduleText: { type: string, maxLength: 300 }
+
+    OfferingSummary:
+      type: object
+      required: [slug, name, summary]
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        summary: { type: string }
+        referencePriceCop: { type: integer, nullable: true, format: int64 }
+        coverImage:
+          description: Omitted when the item has no image
+          allOf: [{ $ref: "#/components/schemas/Image" }]
+    OfferingDetail:
+      allOf:
+        - $ref: "#/components/schemas/OfferingSummary"
+        - type: object
+          required: [description, images]
+          properties:
+            description: { type: string }
+            images:
+              type: array
+              items: { $ref: "#/components/schemas/Image" }
+    OfferingInput:
+      type: object
+      required: [name, summary, description]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        summary: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, minLength: 1, maxLength: 5000 }
+        referencePriceCop: { type: integer, nullable: true, format: int64, minimum: 1 }
+    AdminOffering:
+      allOf:
+        - $ref: "#/components/schemas/OfferingDetail"
+        - type: object
+          required: [id, published, displayOrder, updatedAt]
+          properties:
+            id: { type: integer, format: int64 }
+            published: { type: boolean }
+            displayOrder: { type: integer }
+            updatedAt: { type: string, format: date-time }
+
+    SuccessCaseSummary:
+      type: object
+      required: [slug, title, clientName]
+      properties:
+        slug: { type: string }
+        title: { type: string }
+        clientName: { type: string }
+        eventLabel: { type: string, nullable: true }
+        eventDate: { type: string, nullable: true, format: date }
+        coverImage:
+          description: Omitted when the item has no image
+          allOf: [{ $ref: "#/components/schemas/Image" }]
+    SuccessCaseDetail:
+      allOf:
+        - $ref: "#/components/schemas/SuccessCaseSummary"
+        - type: object
+          required: [description, images, relatedOfferings]
+          properties:
+            description: { type: string }
+            images:
+              type: array
+              items: { $ref: "#/components/schemas/Image" }
+            relatedOfferings:
+              type: array
+              description: Published related offerings only
+              items:
+                type: object
+                properties:
+                  slug: { type: string }
+                  name: { type: string }
+    SuccessCaseInput:
+      type: object
+      required: [title, clientName, description]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 120 }
+        clientName: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string, minLength: 1, maxLength: 5000 }
+        eventLabel: { type: string, nullable: true, maxLength: 120 }
+        eventDate: { type: string, nullable: true, format: date }
+        featured: { type: boolean, default: false }
+        offeringIds:
+          type: array
+          items: { type: integer, format: int64 }
+          uniqueItems: true
+    AdminSuccessCase:
+      allOf:
+        - $ref: "#/components/schemas/SuccessCaseDetail"
+        - type: object
+          required: [id, featured, published, displayOrder, offeringIds, updatedAt]
+          properties:
+            id: { type: integer, format: int64 }
+            featured: { type: boolean }
+            published: { type: boolean }
+            displayOrder: { type: integer }
+            offeringIds:
+              type: array
+              items: { type: integer, format: int64 }
+            updatedAt: { type: string, format: date-time }
+
+    Testimonial:
+      type: object
+      required: [clientName, quote]
+      properties:
+        clientName: { type: string }
+        company: { type: string, nullable: true }
+        quote: { type: string }
+        photo:
+          description: Omitted when the item has no image
+          allOf: [{ $ref: "#/components/schemas/Image" }]
+    TestimonialInput:
+      type: object
+      required: [clientName, quote]
+      properties:
+        clientName: { type: string, minLength: 1, maxLength: 120 }
+        company: { type: string, nullable: true, maxLength: 120 }
+        quote: { type: string, minLength: 1, maxLength: 600 }
+        featured: { type: boolean, default: false }
+    AdminTestimonial:
+      allOf:
+        - $ref: "#/components/schemas/Testimonial"
+        - type: object
+          required: [id, featured, published, displayOrder, updatedAt]
+          properties:
+            id: { type: integer, format: int64 }
+            featured: { type: boolean }
+            published: { type: boolean }
+            displayOrder: { type: integer }
+            updatedAt: { type: string, format: date-time }
+
+    HomeView:
+      type: object
+      required: [profile, offerings, featuredSuccessCases, featuredTestimonials]
+      properties:
+        profile: { $ref: "#/components/schemas/BusinessProfile" }
+        offerings:
+          type: array
+          description: Published offerings in display order (max 6)
+          items: { $ref: "#/components/schemas/OfferingSummary" }
+        featuredSuccessCases:
+          type: array
+          items: { $ref: "#/components/schemas/SuccessCaseSummary" }
+        featuredTestimonials:
+          type: array
+          items: { $ref: "#/components/schemas/Testimonial" }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 1 }
+    AdminMe:
+      type: object
+      properties:
+        email: { type: string }
