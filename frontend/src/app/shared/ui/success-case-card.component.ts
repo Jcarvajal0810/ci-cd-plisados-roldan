@@ -31,24 +31,33 @@ import { ResponsiveImageComponent } from './responsive-image.component';
   `,
   styles: `
     .card {
+      position: relative;
       height: 100%;
+      padding: var(--space-3);
       background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      overflow: hidden;
+      box-shadow: var(--shadow);
+      transition: transform 0.35s ease;
+    }
+    .card:hover {
+      transform: translateY(-5px) rotate(0.6deg);
     }
     .media {
       aspect-ratio: 4 / 3;
+      overflow: hidden;
     }
     .body {
-      padding: var(--space-4);
+      padding: var(--space-4) var(--space-2) var(--space-2);
+      border-top: var(--stitch);
+      margin-top: var(--space-3);
     }
     h3 a {
-      color: var(--color-text);
+      color: var(--color-brand-deep);
       text-decoration: none;
     }
-    h3 a:hover {
-      text-decoration: underline;
+    h3 a::after {
+      content: '';
+      position: absolute;
+      inset: 0;
     }
   `,
 })

@@ -11,10 +11,14 @@ import { SeoService } from '../../core/seo/seo.service';
   template: `
     <section class="section">
       <div class="container">
-        <h1>Servicios</h1>
-        <p class="muted intro">
-          Procesos textiles hechos en gran parte a mano, con la precisión que tu colección necesita.
-        </p>
+        <header class="section-head">
+          <span class="kicker">el taller</span>
+          <h1>Servicios</h1>
+          <p class="muted intro">
+            Procesos textiles hechos en gran parte a mano, con la precisión que tu colección
+            necesita.
+          </p>
+        </header>
         @if (offerings.hasValue()) {
           <ul class="card-grid plain" aria-label="Servicios">
             @for (offering of offerings.value(); track offering.slug; let first = $first) {

@@ -1,23 +1,31 @@
 /*
- * Design tokens and base styles. Mobile first; text/background pairs meet WCAG AA (4.5:1).
- *  --color-text #1f1a17 on --color-bg #fbf8f4  ≈ 16:1
- *  --color-muted #5c534c on --color-bg          ≈ 7.3:1
- *  #ffffff on --color-brand #7a2e3a             ≈ 9.0:1
- *  #ffffff on --color-whatsapp #0b6e4f          ≈ 6.4:1
+ * "Atelier" design system: pleated fabric, seams, thread and fabric tags.
+ * Text/background pairs meet WCAG AA (4.5:1):
+ *  --color-text  #2a1720 on --color-bg #fbf3f1   ≈ 15:1
+ *  --color-muted #6b4d5a on --color-bg           ≈ 6.9:1
+ *  #ffffff on --color-brand #7a1f4a              ≈ 9.4:1
+ *  #ffffff on --color-brand-deep #4a1630         ≈ 14:1
+ *  #ffffff on --color-whatsapp #0b6e4f           ≈ 6.4:1
+ * Gold (--color-thread) is decorative only, never used for text on light backgrounds.
  */
 :root {
-  --color-bg: #fbf8f4;
-  --color-surface: #ffffff;
-  --color-text: #1f1a17;
-  --color-muted: #5c534c;
-  --color-brand: #7a2e3a;
-  --color-brand-soft: #f3e7e5;
-  --color-border: #e4ddd6;
+  --color-bg: #fbf3f1;
+  --color-surface: #fffdfb;
+  --color-text: #2a1720;
+  --color-muted: #6b4d5a;
+  --color-brand: #7a1f4a;
+  --color-brand-deep: #4a1630;
+  --color-brand-soft: #f6e4ea;
+  --color-blush: #f4c6c1;
+  --color-lilac: #f1e4ef;
+  --color-thread: #c49a4a;
+  --color-border: #e8d6da;
   --color-whatsapp: #0b6e4f;
   --color-focus: #1d4ed8;
 
-  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-display: Georgia, 'Times New Roman', serif;
+  --font-body: 'Jost', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-display: 'Bodoni Moda', 'Didot', Georgia, 'Times New Roman', serif;
+  --font-script: 'Pinyon Script', 'Snell Roundhand', cursive;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -26,10 +34,18 @@
   --space-6: 1.5rem;
   --space-8: 2rem;
   --space-12: 3rem;
+  --space-16: 4.5rem;
 
-  --radius: 0.75rem;
-  --content-width: 72rem;
-  --shadow: 0 1px 3px rgb(31 26 23 / 0.08), 0 4px 16px rgb(31 26 23 / 0.06);
+  --radius: 0.25rem;
+  --content-width: 76rem;
+  --shadow: 0 1px 2px rgb(74 22 48 / 0.08), 0 10px 30px -12px rgb(74 22 48 / 0.28);
+  --shadow-lift: 0 2px 4px rgb(74 22 48 / 0.1), 0 22px 44px -16px rgb(74 22 48 / 0.4);
+
+  /* Stitch: a dashed seam line used on cards, fields and tags. */
+  --stitch: 1.5px dashed rgb(196 154 74 / 0.9);
+  /* Pinking-shears zigzag edge (mask on the bottom of swatch cards). */
+  --pinked: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 14px
+    100%;
 }
 
 *,
@@ -40,35 +56,105 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
 }
 
+/*
+ * Background, three fixed layers behind the content:
+ *  body          → linen weave on blush paper
+ *  body::before  → hand-dyed silk blooms + real pleats (highlight, body, crease)
+ *  body::after   → gold embroidered paisleys + a slow satin sheen sweeping across
+ */
 body {
   margin: 0;
-  background: var(--color-bg);
+  min-height: 100vh;
   color: var(--color-text);
   font-family: var(--font-body);
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size: 1.0625rem;
+  font-weight: 400;
+  line-height: 1.65;
+  background-color: var(--color-bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cpath d='M0 3h6M3 0v6' stroke='%237a1f4a' stroke-opacity='.05' stroke-width='1'/%3E%3C/svg%3E");
+}
+
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+body::before {
+  background:
+    radial-gradient(42rem 30rem at 8% 12%, rgb(244 168 176 / 0.38), transparent 70%),
+    radial-gradient(36rem 28rem at 92% 6%, rgb(205 170 220 / 0.36), transparent 70%),
+    radial-gradient(40rem 32rem at 80% 92%, rgb(250 200 160 / 0.34), transparent 70%),
+    radial-gradient(30rem 24rem at 18% 88%, rgb(196 154 74 / 0.16), transparent 70%),
+    repeating-linear-gradient(
+      104deg,
+      rgb(255 255 255 / 0.55) 0 3px,
+      rgb(255 255 255 / 0.18) 3px 16px,
+      rgb(122 31 74 / 0.025) 16px 34px,
+      rgb(122 31 74 / 0.085) 34px 40px,
+      rgb(255 255 255 / 0) 40px 46px
+    ),
+    linear-gradient(180deg, #fdf5f3 0%, #f9ebe8 55%, #f3e3ec 100%);
+}
+
+body::after {
+  background:
+    linear-gradient(
+      115deg,
+      transparent 40%,
+      rgb(255 255 255 / 0.32) 48%,
+      rgb(255 255 255 / 0.08) 52%,
+      transparent 60%
+    ),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cg fill='none' stroke='%23b5893a' stroke-opacity='.38' stroke-width='1.2' stroke-dasharray='3 3' stroke-linecap='round'%3E%3Cpath d='M58 26c36 0 56 42 32 76-16 23-48 25-58 6-8-15 4-29 19-23 11 5 9 19-2 19'/%3E%3Cpath d='M60 42c22 3 31 32 16 52'/%3E%3Cpath transform='rotate(180 165 170)' d='M148 116c36 0 56 42 32 76-16 23-48 25-58 6-8-15 4-29 19-23 11 5 9 19-2 19'/%3E%3Cpath transform='rotate(180 165 170)' d='M150 132c22 3 31 32 16 52'/%3E%3C/g%3E%3Cg fill='%237a1f4a' fill-opacity='.14'%3E%3Ccircle cx='40' cy='18' r='2.4'/%3E%3Ccircle cx='100' cy='40' r='2'/%3E%3Ccircle cx='108' cy='96' r='2.4'/%3E%3Ccircle cx='200' cy='112' r='2'/%3E%3Ccircle cx='150' cy='236' r='2.4'/%3E%3C/g%3E%3Cg stroke='%237a1f4a' stroke-opacity='.16' stroke-width='1.2'%3E%3Cpath d='M210 30l8 8m0-8-8 8M30 200l8 8m0-8-8 8M230 220l6 6m0-6-6 6'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:
+    300% 100%,
+    260px 260px;
+  background-repeat: no-repeat, repeat;
+  animation: sheen 16s ease-in-out infinite;
+}
+
+@keyframes sheen {
+  0%,
+  100% {
+    background-position:
+      100% 0,
+      0 0;
+  }
+  50% {
+    background-position:
+      0% 0,
+      0 0;
+  }
 }
 
 h1,
 h2,
 h3 {
   font-family: var(--font-display);
-  line-height: 1.2;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
   margin: 0 0 var(--space-4);
+  text-wrap: balance;
 }
 
 h1 {
-  font-size: clamp(2rem, 6vw, 3.25rem);
+  font-size: clamp(2.4rem, 7vw, 4.5rem);
 }
 
 h2 {
-  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  font-size: clamp(1.9rem, 4.6vw, 3rem);
 }
 
 h3 {
-  font-size: 1.25rem;
+  font-size: 1.35rem;
 }
 
 p {
@@ -77,6 +163,8 @@ p {
 
 a {
   color: var(--color-brand);
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
 }
 
 img {
@@ -85,9 +173,14 @@ img {
   display: block;
 }
 
+::selection {
+  background: var(--color-blush);
+  color: var(--color-brand-deep);
+}
+
 :focus-visible {
   outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
 .container {
@@ -117,9 +210,54 @@ img {
   border: 0;
 }
 
+.plain {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Section heading: a handwritten word sewn above an editorial serif title. */
+.kicker {
+  display: block;
+  font-family: var(--font-script);
+  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--color-brand);
+  margin-bottom: -0.1em;
+  transform: rotate(-4deg);
+  transform-origin: left bottom;
+}
+
+.section-head {
+  margin-bottom: var(--space-8);
+  max-width: 44rem;
+}
+
+.section-head h2,
+.section-head h1 {
+  margin-bottom: var(--space-3);
+}
+
+/* Seam divider: a dashed thread with a needle eye in the middle. */
+.seam {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-thread);
+  margin-block: var(--space-6);
+}
+
+.seam::before,
+.seam::after {
+  content: '';
+  flex: 1;
+  border-top: var(--stitch);
+}
+
 .card-grid {
   display: grid;
-  gap: var(--space-6);
+  gap: var(--space-8) var(--space-6);
   grid-template-columns: 1fr;
 }
 
@@ -134,25 +272,82 @@ img {
     padding-inline: var(--space-8);
   }
 
+  .section {
+    padding-block: var(--space-16);
+  }
+
   .card-grid {
     grid-template-columns: repeat(3, 1fr);
   }
 }
 
-/* Admin area: forms, buttons, lists (shared to keep component styles small). */
+/* ---------------------------------------------------------------- buttons
+ * Fabric tag: a solid label with an inner stitched seam and a punched eyelet.
+ * Hover slides a satin sheen across, like light running over pleats. */
 .btn {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 40px;
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: 0.5rem;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-6);
+  border: 1px solid var(--color-brand);
+  border-radius: 2px 14px 2px 14px;
   background: var(--color-surface);
-  color: var(--color-text);
+  color: var(--color-brand);
   font: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   text-decoration: none;
   cursor: pointer;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px dashed currentColor;
+  border-radius: inherit;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgb(255 255 255 / 0.45) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.6s ease;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px) rotate(-0.6deg);
+  box-shadow: var(--shadow);
+}
+
+.btn:hover:not(:disabled)::after {
+  transform: translateX(120%);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .btn:disabled {
@@ -162,38 +357,90 @@ img {
 
 .btn-primary {
   background: var(--color-brand);
-  border-color: var(--color-brand);
+  border-color: var(--color-brand-deep);
   color: #fff;
+}
+
+.btn-primary::before {
+  border-color: var(--color-thread);
+  opacity: 0.95;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-brand-deep);
 }
 
 .btn-danger {
   color: #a1251b;
-  border-color: #e5b3ae;
+  border-color: #d99a94;
 }
 
+/* ---------------------------------------------------------------- fields
+ * Fields are fabric swatches: a lilac panel with a seam, the label as a woven tag. */
 .admin-form {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-6);
   max-width: 46rem;
 }
 
 .field {
   display: grid;
-  gap: var(--space-1);
+  gap: var(--space-2);
 }
 
 .field label {
+  font-size: 0.8rem;
   font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-brand-deep);
 }
 
 .field input,
-.field textarea {
+.field textarea,
+.field select {
   width: 100%;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border);
-  border-radius: 0.5rem;
+  border-bottom: 2px dashed var(--color-thread);
+  border-radius: 10px 10px 2px 2px;
   font: inherit;
-  background: var(--color-surface);
+  color: var(--color-text);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 9px, rgb(122 31 74 / 0.03) 9px 10px),
+    var(--color-surface);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.field textarea {
+  min-height: 8rem;
+  resize: vertical;
+}
+
+.field input:hover,
+.field textarea:hover {
+  border-color: var(--color-blush);
+  border-bottom-color: var(--color-brand);
+}
+
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--color-brand);
+  border-bottom-style: solid;
+  box-shadow:
+    0 0 0 4px rgb(122 31 74 / 0.12),
+    0 8px 18px -10px rgb(122 31 74 / 0.5);
+}
+
+.field input[type='checkbox'] {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--color-brand);
 }
 
 .hint {
@@ -228,7 +475,7 @@ img {
 
 .admin-list {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-3);
   list-style: none;
   padding: 0;
 }
@@ -242,7 +489,9 @@ img {
   padding: var(--space-3) var(--space-4);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-brand);
   border-radius: var(--radius);
+  box-shadow: 0 1px 0 rgb(74 22 48 / 0.04);
 }
 
 .item-main,
@@ -265,12 +514,28 @@ img {
   color: var(--color-whatsapp);
 }
 
+/* Reveal on scroll (added by the browser only; SSR output stays visible). */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
   }
 }

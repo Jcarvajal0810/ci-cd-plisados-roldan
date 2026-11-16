@@ -30,17 +30,30 @@ import { Testimonial } from '../../core/api/models';
   `,
   styles: `
     .testimonial {
+      position: relative;
       height: 100%;
       margin: 0;
-      padding: var(--space-6);
+      padding: var(--space-8) var(--space-6) var(--space-6);
       background: var(--color-surface);
       border: 1px solid var(--color-border);
-      border-radius: var(--radius);
+      outline: var(--stitch);
+      outline-offset: -10px;
+    }
+    .testimonial::before {
+      content: '“';
+      position: absolute;
+      top: -0.3em;
+      left: var(--space-4);
+      font-family: var(--font-display);
+      font-size: 5rem;
+      line-height: 1;
+      color: var(--color-blush);
     }
     blockquote {
       margin: 0 0 var(--space-4);
       font-family: var(--font-display);
-      font-size: 1.125rem;
+      font-style: italic;
+      font-size: 1.15rem;
     }
     figcaption {
       display: flex;
@@ -52,6 +65,7 @@ import { Testimonial } from '../../core/api/models';
       height: 56px;
       border-radius: 50%;
       object-fit: cover;
+      box-shadow: 0 0 0 3px var(--color-blush);
     }
   `,
 })

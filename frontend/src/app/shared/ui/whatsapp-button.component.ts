@@ -24,30 +24,82 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
   `,
   styles: `
     .whatsapp {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
       display: inline-flex;
       align-items: center;
       gap: var(--space-2);
-      min-height: 44px;
+      min-height: 48px;
       padding: var(--space-3) var(--space-6);
-      border-radius: 999px;
+      border-radius: 2px 18px 2px 18px;
       background: var(--color-whatsapp);
       color: #fff;
-      font-weight: 600;
+      font-weight: 500;
+      letter-spacing: 0.04em;
       text-decoration: none;
       box-shadow: var(--shadow);
+      transition:
+        transform 0.25s ease,
+        box-shadow 0.25s ease;
+    }
+    .whatsapp::before {
+      content: '';
+      position: absolute;
+      inset: 4px;
+      border: 1px dashed rgb(255 255 255 / 0.55);
+      border-radius: inherit;
+      pointer-events: none;
+    }
+    .whatsapp::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background: linear-gradient(
+        105deg,
+        transparent 35%,
+        rgb(255 255 255 / 0.3) 50%,
+        transparent 65%
+      );
+      transform: translateX(-120%);
+      transition: transform 0.7s ease;
     }
     .whatsapp:hover {
-      filter: brightness(1.1);
+      transform: translateY(-2px) rotate(-0.8deg);
+      box-shadow: var(--shadow-lift);
+    }
+    .whatsapp:hover::after {
+      transform: translateX(120%);
     }
     .floating {
       position: fixed;
       right: var(--space-4);
       bottom: var(--space-4);
-      z-index: 10;
-      width: 56px;
-      height: 56px;
+      z-index: 25;
+      width: 60px;
+      height: 60px;
       padding: 0;
       justify-content: center;
+      overflow: visible;
+      border-radius: 50%;
+    }
+    .floating::before {
+      inset: -7px;
+      border: 2px dashed var(--color-whatsapp);
+      border-radius: 50%;
+      animation: spin 14s linear infinite;
+    }
+    .floating::after {
+      display: none;
+    }
+    .floating:hover {
+      transform: scale(1.06);
+    }
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
     }
   `,
 })

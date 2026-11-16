@@ -34,7 +34,8 @@ import { WhatsAppButtonComponent } from '../../shared/ui/whatsapp-button.compone
           }
         </div>
         <div class="info">
-          <p class="breadcrumb"><a routerLink="/servicios">Servicios</a></p>
+          <p class="breadcrumb"><a routerLink="/servicios">← Servicios</a></p>
+          <span class="kicker">hecho en Plisados Roldán</span>
           <h1>{{ offering().name }}</h1>
           <p class="summary">{{ offering().summary }}</p>
           @if (offering().referencePriceCop) {
@@ -59,13 +60,51 @@ import { WhatsAppButtonComponent } from '../../shared/ui/whatsapp-button.compone
     }
     .gallery {
       display: grid;
-      gap: var(--space-4);
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-3);
+    }
+    .gallery > * {
+      display: block;
+      aspect-ratio: 1;
+      padding: 6px;
+      background: var(--color-surface);
+      box-shadow: var(--shadow);
+      transition: transform 0.35s ease;
+    }
+    .gallery > *:hover {
+      transform: rotate(-1.5deg) scale(1.03);
+    }
+    .gallery > :first-child {
+      grid-column: 1 / -1;
+      aspect-ratio: 4 / 3;
+      padding: 10px 10px 26px;
+    }
+    .info {
+      position: relative;
+      padding: var(--space-8) var(--space-6);
+      background: var(--color-surface);
+      outline: var(--stitch);
+      outline-offset: -12px;
+      box-shadow: var(--shadow);
     }
     .breadcrumb {
-      margin-bottom: var(--space-2);
+      margin-bottom: var(--space-4);
+      font-size: 0.8rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    .breadcrumb a {
+      text-decoration: none;
+    }
+    h1 {
+      font-size: clamp(2.2rem, 5vw, 3.4rem);
+      color: var(--color-brand-deep);
     }
     .summary {
-      font-size: 1.125rem;
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 1.25rem;
+      color: var(--color-brand);
     }
     .price {
       font-size: 1.25rem;
@@ -77,8 +116,12 @@ import { WhatsAppButtonComponent } from '../../shared/ui/whatsapp-button.compone
     }
     @media (min-width: 64rem) {
       .layout {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1.15fr 1fr;
         align-items: start;
+      }
+      .info {
+        position: sticky;
+        top: 6rem;
       }
     }
   `,

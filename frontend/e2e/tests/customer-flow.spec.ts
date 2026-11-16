@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from './admin-credentials';
 
 /**
  * US1 — a prospective client understands the business and contacts it on WhatsApp.
@@ -36,8 +37,33 @@ test('a visitor reaches WhatsApp about a specific service in three taps', async 
 });
 
 test('a service without photos shows a placeholder', async ({ page }) => {
-  await page.goto('/servicios/trillado');
-  await expect(page.getByRole('img', { name: 'Trillado' })).toBeVisible();
+  // Seed services have photos, so publish a temporary one without any (deleted at the end).
+  const name = `Sin fotos ${Date.now()}`;
+  await page.goto('/admin/login');
+  await page.getByLabel('Correo').fill(ADMIN_EMAIL);
+  await page.getByLabel('Contraseña').fill(ADMIN_PASSWORD);
+  await page.getByRole('button', { name: 'Ingresar' }).click();
+  await expect(page.getByRole('heading', { name: 'Panel' })).toBeVisible();
+  await page.getByRole('link', { name: 'Servicios' }).first().click();
+  await page.getByRole('link', { name: 'Nuevo servicio' }).click();
+  await page.getByLabel('Nombre').fill(name);
+  await page.getByLabel('Resumen').fill('Servicio temporal de prueba');
+  await page.getByLabel('Descripción').fill('Servicio temporal sin fotos.');
+  await page.getByRole('button', { name: 'Guardar' }).click();
+  await expect(page.getByRole('status')).toContainText('Guardado');
+  await page.getByRole('button', { name: 'Publicar' }).click();
+  // Publishing without photos asks first.
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Publicar' }).click();
+  await expect(page.getByRole('status')).toContainText('Publicado');
+
+  await page.goto('/servicios');
+  await page.getByRole('link', { name, exact: true }).click();
+  await expect(page.getByRole('img', { name })).toBeVisible();
+
+  await page.goto('/admin/servicios');
+  await page.getByRole('button', { name: `Eliminar ${name}` }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Eliminar' }).click();
+  await expect(page.getByText(name)).toHaveCount(0);
 });
 
 for (const path of ['/', '/servicios', '/servicios/plisado', '/nosotros', '/contacto']) {
