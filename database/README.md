@@ -7,6 +7,7 @@ el backend solo se conecta y lee/escribe datos; nunca crea ni modifica tablas.
 |---|---|
 | `migrations/V1__schema.sql` | Tablas, llaves, `CHECK` y `UNIQUE` (toda regla de integridad marcada [DB] en `specs/001-business-info-site/data-model.md`) |
 | `migrations/V2__seed.sql` | Contenido inicial: perfil del negocio y los 6 servicios |
+| `migrations/V3__seed_service_photos.sql` | Fotos iniciales de los servicios (los archivos están en `backend/seed-media` y los copia el servicio `media-seed`) |
 | `Dockerfile` | Imagen de migraciones (Flyway 11) que aplica `migrations/` y termina |
 
 En `docker-compose.yml` (raíz) el componente son dos servicios:
