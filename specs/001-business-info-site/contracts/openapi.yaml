@@ -95,6 +95,22 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/Testimonial" }
+  /api/public/health:
+    get:
+      tags: [public]
+      summary: Health check for the load balancer and the pipeline (includes the deployed version)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, version, component]
+                properties:
+                  status: { type: string, example: ok }
+                  version: { type: string, example: 3f2a9c1 }
+                  component: { type: string, example: api }
   /sitemap.xml:
     get:
       tags: [public]
