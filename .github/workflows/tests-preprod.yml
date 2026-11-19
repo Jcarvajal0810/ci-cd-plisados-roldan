@@ -20,7 +20,8 @@ jobs:
     env:
       E2E_BASE_URL: ${{ inputs.base_url }}
       EXPECTED_VERSION: ${{ inputs.expected_version }}
-      E2E_ADMIN_EMAIL: ${{ vars.ADMIN_EMAIL }}
+      # Mismo valor que recibe el backend en deploy.yml (TF_VAR_admin_email)
+      E2E_ADMIN_EMAIL: ${{ vars.ADMIN_EMAIL || 'admin@plisados.test' }}
     defaults:
       run:
         working-directory: frontend/e2e

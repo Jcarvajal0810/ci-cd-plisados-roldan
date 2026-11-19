@@ -10,5 +10,6 @@ function required(name: string): string {
   return value;
 }
 
-export const ADMIN_EMAIL = process.env['E2E_ADMIN_EMAIL'] ?? 'admin@example.com';
+// `||` and not `??`: GitHub passes an unset variable as an empty string.
+export const ADMIN_EMAIL = process.env['E2E_ADMIN_EMAIL'] || 'admin@example.com';
 export const ADMIN_PASSWORD = required('E2E_ADMIN_PASSWORD');
