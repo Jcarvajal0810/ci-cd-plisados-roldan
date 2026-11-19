@@ -51,3 +51,4 @@ media/
 /e2e/playwright-report
 
 !src/**/media/
+!src/**/media/
