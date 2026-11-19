@@ -1,8 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
-import { AdminApiClient } from '../../core/api/admin-api.client';
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { Image } from '../../core/api/models';
-import { ConfirmService } from '../../shared/ui/confirm.service';
-import { ACCEPT_ATTRIBUTE, imageFileProblem } from './image-file';
+import { MediaEditor } from './media-editor';
 
 /** The single optional photo of a testimonial: set, replace or remove. */
 @Component({
@@ -48,50 +46,17 @@ import { ACCEPT_ATTRIBUTE, imageFileProblem } from './image-file';
     }
   `,
 })
-export class SinglePhotoComponent {
+export class SinglePhotoComponent extends MediaEditor {
   readonly testimonialId = input.required<number>();
   readonly photo = input<Image | null | undefined>(null);
-  readonly changed = output<void>();
-
-  private readonly api = inject(AdminApiClient);
-  private readonly confirm = inject(ConfirmService);
-
-  protected readonly accept = ACCEPT_ATTRIBUTE;
-  protected readonly busy = signal(false);
-  protected readonly message = signal('');
-
-  protected upload(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) {
-      return;
-    }
-    const problem = imageFileProblem(file);
-    this.message.set(problem);
-    if (problem) {
-      return;
-    }
-    this.busy.set(true);
-    this.api.setTestimonialPhoto(this.testimonialId(), file).subscribe({
-      next: () => {
-        this.busy.set(false);
-        input.value = '';
-        this.changed.emit();
-      },
-      error: (error: { error?: { detail?: string } }) => {
-        this.busy.set(false);
-        this.message.set(error?.error?.detail ?? 'No pudimos subir la foto');
-      },
-    });
-  }
 
   protected async remove(): Promise<void> {
-    if (!(await this.confirm.ask('¿Quitar la foto de este testimonio?', 'Quitar'))) {
-      return;
+    if (await this.confirm.ask('¿Quitar la foto de este testimonio?', 'Quitar')) {
+      this.run(this.api.deleteTestimonialPhoto(this.testimonialId()), 'No pudimos quitar la foto');
     }
-    this.api.deleteTestimonialPhoto(this.testimonialId()).subscribe({
-      next: () => this.changed.emit(),
-      error: () => this.message.set('No pudimos quitar la foto'),
-    });
+  }
+
+  protected upload(event: Event): void {
+    this.uploadChosen(event, (file) => this.api.setTestimonialPhoto(this.testimonialId(), file));
   }
 }

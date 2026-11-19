@@ -1,9 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
-import { Observable } from 'rxjs';
-import { AdminApiClient, GalleryPath } from '../../core/api/admin-api.client';
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { GalleryPath } from '../../core/api/admin-api.client';
 import { Image } from '../../core/api/models';
-import { ConfirmService } from '../../shared/ui/confirm.service';
-import { ACCEPT_ATTRIBUTE, imageFileProblem } from './image-file';
+import { MediaEditor } from './media-editor';
 
 /** Upload, order, describe and remove the photos of one gallery (FR-017, FR-018). */
 @Component({
@@ -98,32 +96,12 @@ import { ACCEPT_ATTRIBUTE, imageFileProblem } from './image-file';
     }
   `,
 })
-export class GalleryManagerComponent {
+export class GalleryManagerComponent extends MediaEditor {
   readonly gallery = input.required<GalleryPath>();
   readonly images = input.required<Image[]>();
-  readonly changed = output<void>();
-
-  private readonly api = inject(AdminApiClient);
-  private readonly confirm = inject(ConfirmService);
-
-  protected readonly accept = ACCEPT_ATTRIBUTE;
-  protected readonly busy = signal(false);
-  protected readonly message = signal('');
 
   protected upload(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) {
-      return;
-    }
-    const problem = imageFileProblem(file);
-    this.message.set(problem);
-    if (problem) {
-      return;
-    }
-    this.run(this.api.uploadImage(this.gallery(), file), 'No pudimos subir la foto', () => {
-      input.value = '';
-    });
+    this.uploadChosen(event, (file) => this.api.uploadImage(this.gallery(), file));
   }
 
   protected move(image: Image, offset: -1 | 1): void {
@@ -144,20 +122,5 @@ export class GalleryManagerComponent {
     if (await this.confirm.ask(`¿Eliminar la foto "${image.alt}"?`)) {
       this.run(this.api.deleteImage(this.gallery(), image.id), 'No pudimos eliminar la foto');
     }
-  }
-
-  private run(request: Observable<unknown>, failure: string, done?: () => void): void {
-    this.busy.set(true);
-    request.subscribe({
-      next: () => {
-        this.busy.set(false);
-        done?.();
-        this.changed.emit();
-      },
-      error: (error: { error?: { detail?: string } }) => {
-        this.busy.set(false);
-        this.message.set(error?.error?.detail ?? failure);
-      },
-    });
   }
 }

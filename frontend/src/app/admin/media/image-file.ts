@@ -15,3 +15,21 @@ export function imageFileProblem(file: File): string {
   }
   return '';
 }
+
+/**
+ * The file chosen in an `<input type="file">` change event, or `null` when nothing was chosen or
+ * the file cannot be uploaded. Reports the problem (or clears it) through `report`.
+ */
+export function chosenImageFile(
+  event: Event,
+  report: (problem: string) => void,
+): { input: HTMLInputElement; file: File } | null {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) {
+    return null;
+  }
+  const problem = imageFileProblem(file);
+  report(problem);
+  return problem ? null : { input, file };
+}

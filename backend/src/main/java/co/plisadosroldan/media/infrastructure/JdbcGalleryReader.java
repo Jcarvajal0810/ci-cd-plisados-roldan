@@ -27,15 +27,7 @@ public class JdbcGalleryReader {
     if (ownerIds.isEmpty()) {
       return result;
     }
-    GalleryTable table = GalleryTable.of(owner);
-    String sql =
-        """
-        SELECT g.%1$s AS owner_id, i.id, i.storage_key, i.width, i.height, i.alt_text
-        FROM %2$s g JOIN image i ON i.id = g.image_id
-        WHERE g.%1$s IN (:ownerIds)
-        ORDER BY g.%1$s, g.position
-        """
-            .formatted(table.ownerColumn(), table.name());
+    String sql = GalleryTable.of(owner).galleries;
     jdbc.sql(sql)
         .param("ownerIds", ownerIds)
         .query(

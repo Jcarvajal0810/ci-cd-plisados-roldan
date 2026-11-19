@@ -35,21 +35,12 @@ class JdbcGalleryRepository implements GalleryRepository {
 
   @Override
   public void addToGallery(GalleryOwner owner, long ownerId, long imageId) {
-    GalleryTable t = GalleryTable.of(owner);
-    jdbc.sql(
-            """
-            INSERT INTO %1$s (%2$s, image_id, position)
-            SELECT ?, ?, coalesce(max(position), 0) + 1 FROM %1$s WHERE %2$s = ?
-            """
-                .formatted(t.name(), t.ownerColumn()))
-        .params(ownerId, imageId, ownerId)
-        .update();
+    jdbc.sql(GalleryTable.of(owner).addToGallery).params(ownerId, imageId, ownerId).update();
   }
 
   @Override
   public int countImages(GalleryOwner owner, long ownerId) {
-    GalleryTable t = GalleryTable.of(owner);
-    return jdbc.sql("SELECT count(*) FROM %s WHERE %s = ?".formatted(t.name(), t.ownerColumn()))
+    return jdbc.sql(GalleryTable.of(owner).countImages)
         .param(ownerId)
         .query(Integer.class)
         .single();
@@ -57,25 +48,12 @@ class JdbcGalleryRepository implements GalleryRepository {
 
   @Override
   public List<Long> imageIds(GalleryOwner owner, long ownerId) {
-    GalleryTable t = GalleryTable.of(owner);
-    return jdbc.sql(
-            "SELECT image_id FROM %s WHERE %s = ? ORDER BY position"
-                .formatted(t.name(), t.ownerColumn()))
-        .param(ownerId)
-        .query(Long.class)
-        .list();
+    return jdbc.sql(GalleryTable.of(owner).imageIds).param(ownerId).query(Long.class).list();
   }
 
   @Override
   public Optional<Image> findInGallery(GalleryOwner owner, long ownerId, long imageId) {
-    GalleryTable t = GalleryTable.of(owner);
-    return jdbc.sql(
-            """
-            SELECT i.id, i.storage_key, i.width, i.height, i.alt_text
-            FROM image i JOIN %s g ON g.image_id = i.id
-            WHERE g.%s = ? AND i.id = ?
-            """
-                .formatted(t.name(), t.ownerColumn()))
+    return jdbc.sql(GalleryTable.of(owner).findInGallery)
         .params(ownerId, imageId)
         .query(
             (rs, n) ->
@@ -101,10 +79,7 @@ class JdbcGalleryRepository implements GalleryRepository {
 
   @Override
   public void updatePositions(GalleryOwner owner, long ownerId, Map<Long, Integer> positions) {
-    GalleryTable t = GalleryTable.of(owner);
-    String sql =
-        "UPDATE %s SET position = ? WHERE %s = ? AND image_id = ?"
-            .formatted(t.name(), t.ownerColumn());
+    String sql = GalleryTable.of(owner).updatePosition;
     positions.forEach(
         (imageId, position) -> jdbc.sql(sql).params(position, ownerId, imageId).update());
   }
