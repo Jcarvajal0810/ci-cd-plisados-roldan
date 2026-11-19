@@ -260,6 +260,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Health check for the load balancer and the pipeline (includes the deployed version) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example ok */
+                            status: string;
+                            /** @example 3f2a9c1 */
+                            version: string;
+                            /** @example api */
+                            component: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sitemap.xml": {
         parameters: {
             query?: never;

@@ -18,6 +18,11 @@ const angularApp = new AngularNodeAppEngine();
 /** gzip every response, including proxied API JSON (SC-003: page weight on mobile). */
 app.use(compression());
 
+/** Health check for the ALB and the pipeline: answers before the SSR host check and the proxy. */
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', version: process.env['APP_VERSION'] ?? 'local', component: 'web' });
+});
+
 /**
  * Single public entry point (research R5): API, media and sitemap requests are proxied to the
  * backend so the browser only ever talks to this origin (no CORS, simple session cookies).
