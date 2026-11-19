@@ -5,7 +5,6 @@ import { Image } from '../../core/api/models';
 import { ConfirmService } from '../../shared/ui/confirm.service';
 import { ACCEPT_ATTRIBUTE, imageFileProblem } from './image-file';
 
-
 /** Upload, order, describe and remove the photos of one gallery (FR-017, FR-018). */
 @Component({
   selector: 'app-gallery-manager',
