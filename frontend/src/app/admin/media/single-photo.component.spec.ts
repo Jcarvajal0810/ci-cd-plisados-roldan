@@ -21,7 +21,9 @@ function setUp(withPhoto: boolean, confirmAnswer = true) {
   fixture.componentRef.setInput('testimonialId', 4);
   fixture.componentRef.setInput(
     'photo',
-    withPhoto ? { id: 3, url: '/media/k-960.jpg', srcset: '', width: 1, height: 1, alt: 'Laura' } : null,
+    withPhoto
+      ? { id: 3, url: '/media/k-960.jpg', srcset: '', width: 1, height: 1, alt: 'Laura' }
+      : null,
   );
   fixture.detectChanges();
   return { fixture, api, confirm };

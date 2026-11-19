@@ -3,7 +3,10 @@
   "version": 1,
   "cli": {
     "packageManager": "npm",
-    "schematicCollections": ["angular-eslint"]
+    "schematicCollections": [
+      "angular-eslint"
+    ],
+    "analytics": false
   },
   "newProjectRoot": "projects",
   "projects": {
@@ -84,6 +87,17 @@
           "options": {
             "coverage": true,
             "coverageReporters": ["lcov", "text-summary"],
+            "coverageInclude": ["src/**/*.ts"],
+            "coverageExclude": [
+              "src/**/*.spec.ts",
+              "src/main.ts",
+              "src/main.server.ts",
+              "src/server.ts",
+              "src/app/app.config*.ts",
+              "src/app/**/*.routes*.ts",
+              "src/app/core/api/models.ts",
+              "src/app/core/api/generated/**"
+            ],
             "coverageThresholds": { "statements": 80, "lines": 80, "functions": 80, "branches": 70 }
           }
         },

@@ -34,5 +34,4 @@ build/
 
 ### Project ###
 .env
-media/
-
+/media/
