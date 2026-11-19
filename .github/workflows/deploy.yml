@@ -1,0 +1,147 @@
+# .github/workflows/deploy.yml — reutilizable: IaC -> Deploy Infra -> Migraciones -> Deploy App
+# Lo usan pipeline.yml (staging, producción y rollback automático) y rollback.yml (botón de pánico).
+name: deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Ambiente a desplegar: staging o production'
+        type: string
+        required: true
+      image_tag:
+        description: 'SHA, vX.Y.Z, LAST_GOOD (SSM current) o PREVIOUS (SSM previous)'
+        type: string
+        required: true
+      app_only:
+        description: 'true en rollbacks: no toca infraestructura ni base de datos'
+        type: boolean
+        default: false
+    outputs:
+      alb_url:
+        description: 'URL pública del ALB del ambiente desplegado'
+        value: ${{ jobs.deploy.outputs.alb_url }}
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }} # en production aquí se pide la aprobación manual
+      url: ${{ steps.wait.outputs.alb_url }}
+    concurrency:
+      group: deploy-${{ inputs.environment }} # nunca dos despliegues a la vez en el mismo ambiente
+      cancel-in-progress: false
+    outputs:
+      alb_url: ${{ steps.wait.outputs.alb_url }}
+    env:
+      ENV_NAME: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: '1.17.1'
+          terraform_wrapper: false # permite leer "terraform output" sin texto extra
+
+      - name: Login a Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Resolver la versión a desplegar
+        id: v
+        run: |
+          TAG='${{ inputs.image_tag }}'
+          case "$TAG" in
+            LAST_GOOD) TAG=$(aws ssm get-parameter --name "/plisados/$ENV_NAME/current" --query Parameter.Value --output text) ;;
+            PREVIOUS)  TAG=$(aws ssm get-parameter --name "/plisados/$ENV_NAME/previous" --query Parameter.Value --output text) ;;
+          esac
+          if [ -z "$TAG" ] || [ "$TAG" = "None" ]; then
+            echo "No hay versión registrada para $ENV_NAME"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "### Desplegando \`$TAG\` en **$ENV_NAME**" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: IaC - fmt, init y plan (platform)
+        if: ${{ !inputs.app_only }}
+        working-directory: infra/platform
+        env:
+          TF_VAR_environment_name: ${{ inputs.environment }}
+          TF_VAR_migrate_image: ${{ steps.ecr.outputs.registry }}/plisados-db-migrate:${{ steps.v.outputs.tag }}
+        run: |
+          terraform fmt -check
+          terraform init -input=false -backend-config=../backend.hcl -backend-config="key=platform/terraform.tfstate"
+          terraform workspace select -or-create "$ENV_NAME"
+          terraform plan -input=false -out=tfplan
+
+      - name: Deploy Infra (apply platform)
+        if: ${{ !inputs.app_only }}
+        working-directory: infra/platform
+        run: terraform apply -input=false tfplan
+
+      - name: Migraciones de base de datos (Flyway en ECS)
+        if: ${{ !inputs.app_only }}
+        working-directory: infra/platform
+        run: |
+          CLUSTER=$(terraform output -raw cluster_name)
+          TD=$(terraform output -raw migrate_task_definition_arn)
+          SUBNETS=$(terraform output -raw subnet_ids)
+          SG=$(terraform output -raw migrate_sg_id)
+          ARN=$(aws ecs run-task --cluster "$CLUSTER" --launch-type FARGATE --task-definition "$TD" \
+            --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SG],assignPublicIp=ENABLED}" \
+            --query 'tasks[0].taskArn' --output text)
+          echo "Tarea de migración: $ARN"
+          aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$ARN"
+          CODE=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$ARN" --query 'tasks[0].containers[0].exitCode' --output text)
+          REASON=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$ARN" --query 'tasks[0].stoppedReason' --output text)
+          echo "Flyway terminó con código $CODE ($REASON)"
+          test "$CODE" = "0"
+
+      - name: Deploy App (apply app)
+        working-directory: infra/app
+        env:
+          TF_VAR_environment_name: ${{ inputs.environment }}
+          TF_VAR_web_image: ${{ steps.ecr.outputs.registry }}/plisados-web:${{ steps.v.outputs.tag }}
+          TF_VAR_api_image: ${{ steps.ecr.outputs.registry }}/plisados-api:${{ steps.v.outputs.tag }}
+          TF_VAR_app_version: ${{ steps.v.outputs.tag }}
+          TF_VAR_admin_email: ${{ vars.ADMIN_EMAIL || 'admin@plisados.test' }}
+        run: |
+          terraform init -input=false -backend-config=../backend.hcl -backend-config="key=app/terraform.tfstate"
+          terraform workspace select -or-create "$ENV_NAME"
+          terraform apply -auto-approve -input=false
+
+      - name: Esperar la versión nueva en web y api
+        id: wait
+        working-directory: infra/app
+        run: |
+          URL=$(terraform output -raw alb_url)
+          echo "alb_url=$URL" >> "$GITHUB_OUTPUT"
+          TAG='${{ steps.v.outputs.tag }}'
+          # Reintenta durante máximo 5 minutos (30 intentos x 10 segundos)
+          for i in $(seq 1 30); do
+            WEB=$(curl -sf "$URL/health" || true)
+            API=$(curl -sf "$URL/api/public/health" || true)
+            if echo "$WEB" | grep -q "$TAG" && echo "$API" | grep -q "$TAG"; then
+              echo "web: $WEB"
+              echo "api: $API"
+              exit 0
+            fi
+            echo "Intento $i/30: aún no responde la versión $TAG, esperando 10 s..."
+            sleep 10
+          done
+          echo "La versión $TAG no quedó en servicio a tiempo"
+          exit 1
