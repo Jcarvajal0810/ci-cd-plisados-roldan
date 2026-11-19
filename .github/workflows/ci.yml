@@ -101,6 +101,11 @@ jobs:
           run_flyway migrate    # 1.a: aplica V1..Vn
           run_flyway migrate    # 2.a: debe decir "Schema ... is up to date"
           run_flyway validate   # checksums coinciden con los archivos
+      - name: Trivy de la imagen de migraciones (falla con CRITICAL, igual que el release)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest \
+            image --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1 \
+            plisados-db-migrate:ci
 
   iac:
     runs-on: ubuntu-latest
