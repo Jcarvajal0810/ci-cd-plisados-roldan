@@ -1,0 +1,35 @@
+# .github/workflows/rollback.yml — BOTON DE PANICO: restaura una version anterior
+name: Rollback manual (boton de panico)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Ambiente a revertir'
+        type: choice
+        options: [production, staging]
+        default: production
+      image_tag:
+        description: 'SHA o vX.Y.Z a restaurar (vacio = version anterior registrada en SSM)'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: ${{ inputs.environment }}
+      image_tag: ${{ inputs.image_tag != '' && inputs.image_tag || 'PREVIOUS' }}
+      app_only: true
+    secrets: inherit
+
+  verify:
+    needs: rollback
+    uses: ./.github/workflows/smoke.yml
+    with:
+      base_url: ${{ needs.rollback.outputs.alb_url }}
+      report_name: smoke-after-panic-rollback
+    secrets: inherit

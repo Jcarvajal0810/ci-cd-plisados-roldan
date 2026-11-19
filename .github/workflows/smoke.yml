@@ -1,0 +1,56 @@
+# .github/workflows/smoke.yml — pruebas de humo post-produccion (solo lectura)
+name: smoke
+
+on:
+  workflow_call:
+    inputs:
+      base_url:
+        type: string
+        required: true
+      expected_version:
+        type: string
+        required: false
+        default: ''
+      force_fail:
+        type: boolean
+        default: false
+      report_name:
+        type: string
+        default: smoke-report
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    env:
+      E2E_BASE_URL: ${{ inputs.base_url }}
+      EXPECTED_VERSION: ${{ inputs.expected_version }}
+      FORCE_SMOKE_FAIL: ${{ inputs.force_fail }}
+    defaults:
+      run:
+        working-directory: frontend/e2e
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Instalar Playwright
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Smoke tests (solo el archivo smoke.spec.ts, proyecto desktop)
+        run: npx playwright test tests/smoke.spec.ts --project=desktop
+
+      - name: Subir reporte
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.report_name }}
+          path: frontend/e2e/playwright-report/
