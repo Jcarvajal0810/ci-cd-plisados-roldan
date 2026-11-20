@@ -169,6 +169,8 @@ jobs:
 
   smoke-after-rollback:
     needs: rollback-production
+    # Sin always() GitHub lo salta: smoke-production (que fallo) esta antes en la cadena.
+    if: always() && needs.rollback-production.result == 'success'
     uses: ./.github/workflows/smoke.yml
     with:
       base_url: ${{ needs.rollback-production.outputs.alb_url }}
