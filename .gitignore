@@ -52,3 +52,12 @@ desktop.ini
 *.tmp
 !backend/src/**/media/
 !frontend/src/**/media/
+
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+tfplan
+crash.log
