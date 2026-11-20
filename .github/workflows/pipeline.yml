@@ -1,0 +1,185 @@
+# .github/workflows/pipeline.yml — orquestador CI/CD (develop -> staging, main -> staging + production)
+name: Pipeline CI/CD
+
+on:
+  push:
+    branches: [develop, main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+    inputs:
+      force_smoke_fail:
+        description: 'Forzar fallo del smoke de produccion (demostrar el rollback automatico)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # crear el tag vX.Y.Z y el GitHub Release
+
+concurrency:
+  group: pipeline-${{ github.ref }}
+  cancel-in-progress: false   # nunca cortar un terraform apply a mitad de camino
+
+jobs:
+  # ------------------------------------------------------------------ CI
+  ci:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  # ------------------------------------------------------------------ Release (artefactos)
+  release:
+    needs: ci
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.semver.outputs.new_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: '1.17.1'
+          terraform_wrapper: false
+
+      - name: IaC capa shared (repositorios ECR, idempotente)
+        working-directory: infra/shared
+        run: |
+          terraform init -input=false -backend-config=../backend.hcl -backend-config="key=shared/terraform.tfstate"
+          terraform apply -auto-approve -input=false
+
+      - name: Login a Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Calcular version SemVer (solo main)
+        id: semver
+        if: github.ref == 'refs/heads/main'
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          dry_run: true
+          default_bump: patch
+
+      - name: Build de las 3 imagenes
+        env:
+          REG: ${{ steps.ecr.outputs.registry }}
+        run: |
+          docker build -t "$REG/plisados-web:$GITHUB_SHA" ./frontend
+          docker build -t "$REG/plisados-api:$GITHUB_SHA" ./backend
+          docker build -t "$REG/plisados-db-migrate:$GITHUB_SHA" ./database
+
+      - name: Escaneo de seguridad con Trivy (falla con CRITICAL)
+        env:
+          REG: ${{ steps.ecr.outputs.registry }}
+          TRIVY_IMAGE: aquasec/trivy:latest   # cambiar por una version fija verificada (ej. aquasec/trivy:0.x.y)
+        run: |
+          for img in web api db-migrate; do
+            echo "== plisados-$img =="
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE" \
+              image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 0 \
+              "$REG/plisados-$img:$GITHUB_SHA"
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE" \
+              image --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1 --quiet \
+              "$REG/plisados-$img:$GITHUB_SHA"
+          done
+
+      - name: Push a ECR (tag SHA y, en main, vX.Y.Z)
+        env:
+          REG: ${{ steps.ecr.outputs.registry }}
+          VER: ${{ steps.semver.outputs.new_tag }}
+        run: |
+          for img in web api db-migrate; do
+            # ECR es IMMUTABLE: si el job se re-ejecuta, la imagen de este SHA ya existe
+            if aws ecr describe-images --repository-name "plisados-$img" --image-ids imageTag="$GITHUB_SHA" >/dev/null 2>&1; then
+              echo "plisados-$img:$GITHUB_SHA ya existe en ECR"
+            else
+              docker push "$REG/plisados-$img:$GITHUB_SHA"
+            fi
+            if [ -n "$VER" ] && ! aws ecr describe-images --repository-name "plisados-$img" --image-ids imageTag="$VER" >/dev/null 2>&1; then
+              docker tag "$REG/plisados-$img:$GITHUB_SHA" "$REG/plisados-$img:$VER"
+              docker push "$REG/plisados-$img:$VER"
+            fi
+          done
+
+  # ------------------------------------------------------------------ Staging
+  deploy-staging:
+    needs: release
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: staging
+      image_tag: ${{ github.sha }}
+    secrets: inherit
+
+  test-staging:
+    needs: deploy-staging
+    uses: ./.github/workflows/tests-preprod.yml
+    with:
+      base_url: ${{ needs.deploy-staging.outputs.alb_url }}
+      expected_version: ${{ github.sha }}
+    secrets: inherit
+
+  mark-good-staging:
+    needs: test-staging
+    uses: ./.github/workflows/mark-good.yml
+    with:
+      environment: staging
+      image_tag: ${{ github.sha }}
+    secrets: inherit
+
+  # ------------------------------------------------------------------ Production (solo main)
+  deploy-production:
+    needs: [release, test-staging]
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/deploy.yml   # environment: production -> aprobacion manual
+    with:
+      environment: production
+      image_tag: ${{ github.sha }}
+    secrets: inherit
+
+  smoke-production:
+    needs: deploy-production
+    uses: ./.github/workflows/smoke.yml
+    with:
+      base_url: ${{ needs.deploy-production.outputs.alb_url }}
+      expected_version: ${{ github.sha }}
+      force_fail: ${{ inputs.force_smoke_fail == true }}
+    secrets: inherit
+
+  rollback-production:
+    needs: [deploy-production, smoke-production]
+    if: failure() && needs.deploy-production.result == 'success'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: production
+      image_tag: LAST_GOOD
+      app_only: true
+    secrets: inherit
+
+  smoke-after-rollback:
+    needs: rollback-production
+    uses: ./.github/workflows/smoke.yml
+    with:
+      base_url: ${{ needs.rollback-production.outputs.alb_url }}
+      report_name: smoke-after-rollback
+    secrets: inherit
+
+  mark-good-production:
+    needs: [release, smoke-production]
+    uses: ./.github/workflows/mark-good.yml
+    with:
+      environment: production
+      image_tag: ${{ github.sha }}
+      release_version: ${{ needs.release.outputs.version }}
+    secrets: inherit

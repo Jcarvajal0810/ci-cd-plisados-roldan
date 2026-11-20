@@ -1,0 +1,61 @@
+# .github/workflows/destroy.yml — apaga un ambiente para no gastar el presupuesto del Learner Lab
+# Destruye la capa app y luego la platform. La capa shared (ECR) y el bucket del estado se conservan.
+name: Destruir ambiente
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Ambiente a destruir'
+        type: choice
+        options: [staging, production]
+      confirm:
+        description: 'Escribe DESTRUIR para confirmar'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  destroy:
+    if: inputs.confirm == 'DESTRUIR'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }} # en production también pide aprobación
+    concurrency:
+      group: deploy-${{ inputs.environment }} # no choca con un despliegue en curso
+      cancel-in-progress: false
+    env:
+      ENV_NAME: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: '1.17.1'
+          terraform_wrapper: false
+
+      - name: Destruir capa app
+        working-directory: infra/app
+        run: |
+          terraform init -input=false -backend-config=../backend.hcl -backend-config="key=app/terraform.tfstate"
+          terraform workspace select "$ENV_NAME"
+          terraform destroy -auto-approve -input=false -var="environment_name=$ENV_NAME" -var="web_image=x" -var="api_image=x"
+
+      - name: Destruir capa platform
+        working-directory: infra/platform
+        run: |
+          terraform init -input=false -backend-config=../backend.hcl -backend-config="key=platform/terraform.tfstate"
+          terraform workspace select "$ENV_NAME"
+          terraform destroy -auto-approve -input=false -var="environment_name=$ENV_NAME" -var="migrate_image=x"

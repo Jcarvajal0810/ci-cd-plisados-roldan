@@ -1,0 +1,64 @@
+# .github/workflows/tests-preprod.yml — pruebas contra staging (pre-produccion)
+name: tests-preprod
+
+on:
+  workflow_call:
+    inputs:
+      base_url:
+        type: string
+        required: true
+      expected_version:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-staging:
+    runs-on: ubuntu-latest
+    env:
+      E2E_BASE_URL: ${{ inputs.base_url }}
+      EXPECTED_VERSION: ${{ inputs.expected_version }}
+      # Mismo valor que recibe el backend en deploy.yml (TF_VAR_admin_email)
+      E2E_ADMIN_EMAIL: ${{ vars.ADMIN_EMAIL || 'admin@plisados.test' }}
+    defaults:
+      run:
+        working-directory: frontend/e2e
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Contrasena admin de staging desde Secrets Manager (enmascarada)
+        run: |
+          P=$(aws secretsmanager get-secret-value --secret-id plisados-staging-admin-password --query SecretString --output text)
+          echo "::add-mask::$P"
+          echo "E2E_ADMIN_PASSWORD=$P" >> "$GITHUB_ENV"
+
+      - name: Instalar Playwright
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: e2e completo (cliente, admin, SEO, a11y, prueba social, smoke)
+        run: npx playwright test
+
+      - name: Subir reporte de Playwright
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: staging-e2e-report
+          path: frontend/e2e/playwright-report/

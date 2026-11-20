@@ -1,0 +1,51 @@
+# .github/workflows/mark-good.yml — registra la ultima version buena (y crea el Release en produccion)
+name: mark-good
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      image_tag:
+        type: string
+        required: true
+      release_version:
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  mark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: previous <- current ; current <- version desplegada
+        env:
+          ENV_NAME: ${{ inputs.environment }}
+          TAG: ${{ inputs.image_tag }}
+        run: |
+          CUR=$(aws ssm get-parameter --name "/plisados/$ENV_NAME/current" --query Parameter.Value --output text 2>/dev/null || true)
+          if [ -n "$CUR" ] && [ "$CUR" != "$TAG" ]; then
+            aws ssm put-parameter --name "/plisados/$ENV_NAME/previous" --type String --overwrite --value "$CUR"
+          fi
+          aws ssm put-parameter --name "/plisados/$ENV_NAME/current" --type String --overwrite --value "$TAG"
+          echo "current=$TAG previous=${CUR:-<ninguna>}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Crear tag y GitHub Release
+        if: inputs.release_version != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_version }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
